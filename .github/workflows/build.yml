@@ -1,4 +1,4 @@
-name: Build & Inject MyPvPClient
+name: Build MyPvPClient
 
 on:
   push:
@@ -18,35 +18,49 @@ jobs:
       with:
         xcode-version: '15.4'
 
-    # 1. Dobby Header'ları ve Hazır Prebuilt İOS Statik Kütüphanesini Çek
-    - name: Fetch Prebuilt Dobby Framework
+    # Dobby Kaynak Kodlarını Çek
+    - name: Clone Dobby Repo
       run: |
         mkdir -p vendor
         git clone --depth 1 https://github.com/jmpews/Dobby.git vendor/dobby
-        
-        # Dobby'nin release build'lerinden iOS dylib/static kütüphanesini alıyoruz
-        mkdir -p vendor/dobby/build
-        curl -L -o vendor/dobby/build/libdobby.a https://github.com/jmpews/Dobby/releases/download/v1.2.6/libdobby.a || true
 
-    # 2. Eğer curl ile inmezse doğrudan Dobby başlıkları ile minimal Clang Derlemesi Yap
-    - name: Compile Dylib with Clang (ARM64 iOS)
+    # Dobby'nin iOS ARM64 İçin Gerekli C/C++ Kodlarını Doğrudan Biz Derliyoruz
+    - name: Compile Dylib (Standalone Build)
       run: |
         mkdir -p build
-        
-        # Hazır dylib/static yoksa fallback olarak Dobby core C/C++ sınıflarını bağla
         xcrun --sdk iphoneos clang++ -dynamiclib \
           -arch arm64 \
           -miphoneos-version-min=14.0 \
           -std=c++17 \
           -O2 \
+          -DDOBBY_DEBUG=0 \
           -Ivendor/dobby/include \
+          -Ivendor/dobby/source \
+          -Ivendor/dobby/builtin-plugin/SymbolResolver \
           -Isrc \
           src/main.cpp src/XboxFix.cpp \
-          vendor/dobby/build/libdobby.a \
+          vendor/dobby/source/dobby.cpp \
+          vendor/dobby/source/InterceptRouting/InterceptRouting.cpp \
+          vendor/dobby/source/InterceptRouting/ExtraInternalPlugin/RegisterInspection/RegisterInspection.cpp \
+          vendor/dobby/source/Backend/UserMode/ExecMemory/code-patch-tool-posix.cc \
+          vendor/dobby/source/Backend/UserMode/ExecMemory/clear-cache-tool-all.c \
+          vendor/dobby/source/Backend/UserMode/UnifiedInterface/platform-posix.cc \
+          vendor/dobby/source/Backend/UserMode/PlatformUtil/Darwin/ProcessRuntime.cc \
+          vendor/dobby/source/InstructionRelocation/arm64/InstructionRelocationARM64.cc \
+          vendor/dobby/source/core/assembler/assembler-arm64.cc \
+          vendor/dobby/source/core/codegen/codegen-arm64.cc \
+          vendor/dobby/source/TrampolineBridge/ClosureTrampolineBridge/arm64/closure_bridge_arm64.cc \
+          vendor/dobby/source/TrampolineBridge/ClosureTrampolineBridge/arm64/ClosureTrampolineARM64.cc \
+          vendor/dobby/source/TrampolineBridge/ClosureTrampolineBridge/arm64/helper_arm64.cc \
+          vendor/dobby/source/TrampolineBridge/Trampoline/trampoline_arm64.cc \
+          vendor/dobby/source/InterceptRouting/NearBranchTrampoline/near_trampoline_arm64.cc \
+          vendor/dobby/builtin-plugin/SymbolResolver/macho/dobby_symbol_resolver.cc \
+          vendor/dobby/builtin-plugin/SymbolResolver/macho/macho_file_symbol_resolver.cpp \
+          vendor/dobby/builtin-plugin/SymbolResolver/macho/shared_cache_ctx.cpp \
           -framework Foundation -framework UIKit \
           -o build/MyPvPClient.dylib
 
-    # 3. İndirilebilir Çıktı Oluştur
+    # İndirilebilir Çıktı Oluştur
     - name: Upload Dylib Artifact
       uses: actions/upload-artifact@v4
       with:
