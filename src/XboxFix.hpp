@@ -1,5 +1,4 @@
 #ifndef XBOXFIX_HPP
-#ifndef XBOXFIX_HPP
 #define XBOXFIX_HPP
 
 #include <cstdint>
