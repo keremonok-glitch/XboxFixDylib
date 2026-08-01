@@ -20,11 +20,21 @@ jobs:
       with:
         xcode-version: '15.4'
 
-    - name: Clone Dobby Framework
+    # 1. Dobby'yi İndir ve CMake ile iOS ARM64 için Derle
+    - name: Build Dobby Framework
       run: |
-        mkdir -p vendor
         git clone --depth 1 https://github.com/jmpews/Dobby.git vendor/dobby
+        mkdir -p vendor/dobby/build
+        cd vendor/dobby/build
+        cmake .. \
+          -DCMAKE_SYSTEM_NAME=iOS \
+          -DCMAKE_OSX_SYSROOT=iphoneos \
+          -DCMAKE_OSX_ARCHITECTURES=arm64 \
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
+          -DDOBBY_GENERATE_SHARED=OFF
+        make -j$(sysctl -n hw.ncpu)
 
+    # 2. Dylib'i Derlenmiş libdobby.a ile Bağlayarak (Link) Üret
     - name: Compile Dylib with Clang (ARM64 iOS)
       run: |
         mkdir -p build
@@ -35,9 +45,11 @@ jobs:
           -Ivendor/dobby/include \
           -Isrc \
           src/main.cpp src/XboxFix.cpp \
+          vendor/dobby/build/libdobby.a \
           -framework Foundation -framework UIKit \
           -o build/MyPvPClient.dylib
 
+    # 3. Çıktıyı Artifact Olarak Yükle
     - name: Upload Dylib Artifact
       uses: actions/upload-artifact@v4
       with:
