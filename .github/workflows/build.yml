@@ -18,26 +18,28 @@ jobs:
       with:
         xcode-version: '15.4'
 
-    # Dobby'nin Hazır Başlık Dosyalarını ve Statik Kütüphanesini İndir
-    - name: Download Prebuilt Dobby Framework
+    - name: Clone Dobby Repo
       run: |
         mkdir -p vendor
         git clone --depth 1 https://github.com/jmpews/Dobby.git vendor/dobby
-        
-        # iOS ARM64 için Dobby Statik Kütüphanesini CMake ile minimal Derle
+
+    # Dobby'ye TargetArch=arm64 Parametresini Açıkça Veriyoruz
+    - name: Build Dobby Static Library
+      run: |
         cd vendor/dobby
-        mkdir build && cd build
+        mkdir -p build && cd build
         cmake .. \
           -DCMAKE_SYSTEM_NAME=iOS \
           -DCMAKE_OSX_SYSROOT=iphoneos \
           -DCMAKE_OSX_ARCHITECTURES=arm64 \
           -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
+          -DTargetArch=arm64 \
           -DDOBBY_GENERATE_SHARED=OFF \
           -DDOBBY_BUILD_EXAMPLE=OFF \
           -DDOBBY_BUILD_TEST=OFF
         make -j$(sysctl -n hw.ncpu) dobby_static
 
-    # C++ Kodumuzu Hazır Dobby İle Derle
+    # C++ Kodumuzu Derle ve Dobby İle Bağla
     - name: Compile Dylib with Clang (ARM64 iOS)
       run: |
         mkdir -p build
@@ -52,7 +54,7 @@ jobs:
           -framework Foundation -framework UIKit \
           -o build/MyPvPClient.dylib
 
-    # Oluşan Dylib Dosyasını artifact Olarak Sun
+    # Üretilen Dylib'i İndirilebilir Yap
     - name: Upload Dylib Artifact
       uses: actions/upload-artifact@v4
       with:
