@@ -1,4 +1,3 @@
-
 name: Build & Inject MyPvPClient
 
 on:
@@ -13,19 +12,33 @@ jobs:
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
-      with:
-        submodules: recursive
 
     - name: Setup Xcode Environment
       uses: maxim-lobanov/setup-xcode@v1
       with:
         xcode-version: '15.4'
 
-    - name: Clone Dobby Repo
+    # Dobby'nin Hazır Başlık Dosyalarını ve Statik Kütüphanesini İndir
+    - name: Download Prebuilt Dobby Framework
       run: |
+        mkdir -p vendor
         git clone --depth 1 https://github.com/jmpews/Dobby.git vendor/dobby
+        
+        # iOS ARM64 için Dobby Statik Kütüphanesini CMake ile minimal Derle
+        cd vendor/dobby
+        mkdir build && cd build
+        cmake .. \
+          -DCMAKE_SYSTEM_NAME=iOS \
+          -DCMAKE_OSX_SYSROOT=iphoneos \
+          -DCMAKE_OSX_ARCHITECTURES=arm64 \
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
+          -DDOBBY_GENERATE_SHARED=OFF \
+          -DDOBBY_BUILD_EXAMPLE=OFF \
+          -DDOBBY_BUILD_TEST=OFF
+        make -j$(sysctl -n hw.ncpu) dobby_static
 
-    - name: Compile Dylib with Integrated Dobby (ARM64 iOS)
+    # C++ Kodumuzu Hazır Dobby İle Derle
+    - name: Compile Dylib with Clang (ARM64 iOS)
       run: |
         mkdir -p build
         xcrun --sdk iphoneos clang++ -dynamiclib \
@@ -33,15 +46,13 @@ jobs:
           -miphoneos-version-min=14.0 \
           -std=c++17 \
           -Ivendor/dobby/include \
-          -Ivendor/dobby/source \
-          -Ivendor/dobby/builtin-plugin/SymbolResolver \
           -Isrc \
           src/main.cpp src/XboxFix.cpp \
-          $(find vendor/dobby/source -name "*.cc" -o -name "*.c" -o -name "*.cpp") \
-          $(find vendor/dobby/builtin-plugin -name "*.cc" -o -name "*.c" -o -name "*.cpp") \
+          vendor/dobby/build/libdobby.a \
           -framework Foundation -framework UIKit \
           -o build/MyPvPClient.dylib
 
+    # Oluşan Dylib Dosyasını artifact Olarak Sun
     - name: Upload Dylib Artifact
       uses: actions/upload-artifact@v4
       with:
