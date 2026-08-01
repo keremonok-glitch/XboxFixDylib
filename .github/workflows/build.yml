@@ -24,7 +24,7 @@ jobs:
         mkdir -p vendor
         git clone --recursive --depth 1 https://github.com/jmpews/Dobby.git vendor/dobby
 
-    # 2. Dobby'yi CMake ile Derle (En Sağlam Yöntem)
+    # 2. Dobby'yi CMake ile Derle (İşlemci Mimarisi Parametresi Eklendi)
     - name: Build Dobby Library via CMake
       run: |
         mkdir -p vendor/dobby/build
@@ -32,8 +32,10 @@ jobs:
         cmake .. \
           -DCMAKE_SYSTEM_NAME=iOS \
           -DCMAKE_OSX_ARCHITECTURES=arm64 \
+          -DDOBBY_BUILD_ARCH=arm64 \
           -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
           -DDOBBY_GENERATE_SHARED=OFF \
+          -DCMAKE_POLICY_DEFAULT_CMP0000=OLD \
           -DCMAKE_BUILD_TYPE=Release
         make -j$(sysctl -n hw.ncpu)
 
@@ -42,7 +44,6 @@ jobs:
       run: |
         mkdir -p build
         
-        # src klasöründeki kendi .cpp ve .mm dosyalarını bul
         SRC_FILES=$(find src -name "*.cpp" -o -name "*.mm" -o -name "*.c")
         
         xcrun --sdk iphoneos clang++ -dynamiclib \
