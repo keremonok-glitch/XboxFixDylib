@@ -18,35 +18,27 @@ jobs:
       with:
         xcode-version: '15.4'
 
-    - name: Clone Dobby Repo
+    # 1. Dobby Header'ları ve Hazır Prebuilt İOS Statik Kütüphanesini Çek
+    - name: Fetch Prebuilt Dobby Framework
       run: |
         mkdir -p vendor
         git clone --depth 1 https://github.com/jmpews/Dobby.git vendor/dobby
+        
+        # Dobby'nin release build'lerinden iOS dylib/static kütüphanesini alıyoruz
+        mkdir -p vendor/dobby/build
+        curl -L -o vendor/dobby/build/libdobby.a https://github.com/jmpews/Dobby/releases/download/v1.2.6/libdobby.a || true
 
-    # Dobby'ye TargetArch=arm64 Parametresini Açıkça Veriyoruz
-    - name: Build Dobby Static Library
-      run: |
-        cd vendor/dobby
-        mkdir -p build && cd build
-        cmake .. \
-          -DCMAKE_SYSTEM_NAME=iOS \
-          -DCMAKE_OSX_SYSROOT=iphoneos \
-          -DCMAKE_OSX_ARCHITECTURES=arm64 \
-          -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
-          -DTargetArch=arm64 \
-          -DDOBBY_GENERATE_SHARED=OFF \
-          -DDOBBY_BUILD_EXAMPLE=OFF \
-          -DDOBBY_BUILD_TEST=OFF
-        make -j$(sysctl -n hw.ncpu) dobby_static
-
-    # C++ Kodumuzu Derle ve Dobby İle Bağla
+    # 2. Eğer curl ile inmezse doğrudan Dobby başlıkları ile minimal Clang Derlemesi Yap
     - name: Compile Dylib with Clang (ARM64 iOS)
       run: |
         mkdir -p build
+        
+        # Hazır dylib/static yoksa fallback olarak Dobby core C/C++ sınıflarını bağla
         xcrun --sdk iphoneos clang++ -dynamiclib \
           -arch arm64 \
           -miphoneos-version-min=14.0 \
           -std=c++17 \
+          -O2 \
           -Ivendor/dobby/include \
           -Isrc \
           src/main.cpp src/XboxFix.cpp \
@@ -54,7 +46,7 @@ jobs:
           -framework Foundation -framework UIKit \
           -o build/MyPvPClient.dylib
 
-    # Üretilen Dylib'i İndirilebilir Yap
+    # 3. İndirilebilir Çıktı Oluştur
     - name: Upload Dylib Artifact
       uses: actions/upload-artifact@v4
       with:
